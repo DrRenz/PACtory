@@ -1,0 +1,357 @@
+#!/usr/bin/perl -w
+
+# This script is licensed under GNU GPL version 3.0 or above
+#
+# Copyright (C) 2007-2010 The PACtory Development Team
+#
+# This file is part of the PACtory project.
+# Feedback/comment/suggestions: http://pactory.sf.net
+
+use strict;
+use Sys::Hostname;
+
+my $configdir="/var/www/htdocs/config";
+
+
+# "Schablone" fuer Javascript-PAC-Datei in Array speichern
+# ToDo: Falls pacfile.template nicht existiert, "Standard" generieren
+
+sub readTemplate {
+  my @template = ();
+  open(TEMPLATE, "<$configdir/pacfile.template") || die "Template file $configdir/pacfile.template not found!\n";
+  @template = <TEMPLATE>;
+  close(TEMPLATE);
+  return @template;
+}
+
+# Netzwerk-zu-Lokation-Zuordnungen laden
+
+sub readNetworks {
+  my @network = ();
+
+  #print "<BR><B>Start readNetworks</B><BR>";
+  open (LIST, "$configdir/network.list") || die "Network list file $configdir/network.list not found!\n";
+  while (<LIST>) {
+    chomp;
+    next if /^\s*\#|^$/;
+    push @network,$_;
+  }
+  close (LIST);
+
+  my $count=0;
+  my @splitNetworks;
+  #print "<BR><B>Start sorting</B><BR>";
+  foreach (@network) {
+    my ($location,$network,$netmask) = split (' '); 
+    my @splitNetmask = split(/\./,$netmask);
+    my $decimalNetmask=$splitNetmask[0]*256*256*256+$splitNetmask[1]*256*256+$splitNetmask[2]*256+$splitNetmask[3];
+    push @splitNetworks,"$decimalNetmask $location $network $netmask";
+  }
+  #print "<BR>@splitNetworks<BR>";
+  my @sortednetworklist = sort { ( split / /, $a )[0] <=> ( split / /, $b )[0] } @splitNetworks;
+  @sortednetworklist = reverse(@sortednetworklist);
+  #print "<BR>@sortednetworklist<BR>";
+  #print "<BR><B>End readNetworks</B><BR>";
+}
+
+# Finde die passende "Ortsnummer" zur uebergebenen IP-Adresse
+# (Datei: network.list; Whitespace-getrenntes Dateiformat: Netzwerk Netzmaske Orts-ID)
+
+sub getLocationID {
+  my ($ip2FindLoc) = @_;
+
+  my @networklist=readNetworks();
+  foreach (@networklist) {
+    chomp;
+    next if /^\s*\#/;
+    my ($decimalNetmask,$location,$network,$netmask) = split (' '); 
+    #print $ip2FindLoc,"Netzwerk: ",$network," ist ",isInNet($ip2FindLoc,$network,$netmask),"\n";
+    if (isInNet($ip2FindLoc,$network,$netmask)==1) {
+      #print "<H3>END NETLIST - net found</H3>\r\n";
+      return $location;
+    }
+  }
+
+  #print "<H3>END NETLIST - no net found</H3>\r\n";
+  # Kein passendes Netz gefunden :-(
+  return "0";
+}
+
+
+# Zugehoerigkeit von Adresse zu Subnetz pruefen
+# Gib 8: Kleiner werdende Netzwerkmasken! Sonst evtl. zu "ungenauer" Match
+
+sub isInNet {
+  my ($ownip,$pattern,$mask) = @_;
+
+  my @ownip = split(/\./,$ownip);
+  my @mask = split(/\./,$mask);
+  my @pattern;
+
+  foreach my $count (0..3) {
+    my $bitAddr = dec2bin($ownip[$count]);
+    my $bitMask = dec2bin($mask[$count]);
+    $pattern[$count] = bin2dec($bitAddr & $bitMask);
+  }
+
+  my $hostPattern = join(".",@pattern);
+  #print $pattern[0].".".$pattern[1].".".$pattern[2].".".$pattern[3]."<BR>";
+  return (($pattern eq $hostPattern) ? 1 : 0);
+}
+
+
+# Hilfsroutine: Netzwerkmaske in Binaerstring umwandeln
+
+sub dec2bin {
+  my $str = unpack("B32", pack("N", shift));
+  return $str;
+}
+
+
+# Hilfsroutine: Binaerstring in Netzwerkmaske umwandeln
+
+sub bin2dec {
+  return unpack("N", pack("B32", substr("0" x 32 . shift, -32)));
+}
+
+
+
+# Zu Standort gehoerende Proxy-Parameter zurueckgeben
+
+sub getProxyList {
+  my ($locationToMatch) = @_;
+  my @locationConfigArray = ();
+
+  open (LIST, "$configdir/locations.list") || die "Location proxy settings file $configdir/locations.list not found!\n";
+
+  #print "<H3>START LOCLIST</H3>\r\n";
+  while (<LIST>) {
+    chomp;
+    next if /^\s*\#|^$/;
+    my ($location,$configString) = split(' ',$_,2); 
+    if ($location eq $locationToMatch) {
+      push(@locationConfigArray,$configString);
+      #print "<BR>$location == $configString";
+    }
+  }
+  #print "<H3>END LOCLIST</H3>\r\n";
+  close (LIST);
+  return @locationConfigArray;
+}
+
+# Zeitstempel erzeugen
+
+sub timeStamp {
+  (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst)=localtime(time);
+  my $timeStamp=sprintf("%4d-%02d-%02d %02d:%02d:%02d", $year+1900,$mon+1,$mday,$hour,$min,$sec);
+  return $timeStamp;
+}
+
+
+
+#
+# Hauptteil
+#
+
+# Zeitstempel Start
+
+my $startDate=timeStamp();
+
+# Dynamische Daten aus den Browser-Variablen holen
+
+my $remoteAddr = $ENV{REMOTE_ADDR};
+my $remoteAgent = $ENV{HTTP_USER_AGENT};
+if ( !defined $remoteAgent ) { $remoteAgent = "unknown" };
+my $hostname = hostname();
+#return unless defined($remoteAddr);
+
+print "Content-type: application/x-ns-proxy-autoconfig\r\n";
+print "Cache-Control: max-age=60\r\n\r\n";
+#print "<PRE>Hier ist die Adresse: $remoteAddr\r\n<BR>mit $remoteAgent\n";
+
+# Werte fuer globale Default-Config festlegen (werden spaeter evtl. ueberschrieben)
+
+my @defaultConfig=(getProxyList("DEFAULT"));
+my @globalDomainArray=();
+my @specialDstArray=();
+my %globalProxyHash=();
+
+#print "<HR><B>defaultConfig gefunden:</B>";
+foreach (@defaultConfig) {
+  (my $command, my $argument)=split(" ",$_,2);
+  #print "<BR>$command == $argument";
+  if ( $command eq "DOMAIN" ) { push @globalDomainArray,$argument }
+  elsif ( $command eq "EXTRA" ) { push @specialDstArray,$argument }
+  else { 
+    if (defined $globalProxyHash {$command}) {
+      $globalProxyHash {$command}=$globalProxyHash{$command}."; ".$argument;
+    } else {
+      $globalProxyHash {$command}=$argument;
+    }
+  }
+}
+
+# Hier die Werte fuer den jeweiligen Standort beziehen
+
+my $location=(getLocationID($remoteAddr));
+#my $location="Lesser";
+my @locationConfig=();
+my @locationDomainArray=();
+my %locationProxyHash=();
+@locationConfig=(getProxyList($location));
+
+#print "<HR><B>locationConfig fuer Standort \"$location\" gefunden:</B>";
+foreach (@locationConfig) {
+  (my $command, my $argument)=split(" ",$_,2);
+  #print "<BR>$command == $argument";
+  if ( $command eq "DOMAIN" ) { push @locationDomainArray,$argument }
+  elsif ( $command eq "EXTRA" ) { push @specialDstArray,$argument }
+  else { 
+    if (defined $locationProxyHash {$command}) {
+      $locationProxyHash {$command}=$locationProxyHash{$command}."; ".$argument;
+    } else {
+      $locationProxyHash {$command}=$argument;
+    }
+  }
+  #push @locationProxyArray,$_ }
+}
+
+#print "<BR><B>globalDomainArray</B>";
+foreach (@globalDomainArray) {
+  #print "<BR>".$_;
+}
+#print "<BR><B>globalProxyHash</B>";
+for my $service ( keys %globalProxyHash ) {
+  #print "<BR>$service -> ".$globalProxyHash{$service};
+}
+
+#print "<BR><B>locationDomainArray</B>";
+foreach (@locationDomainArray) {
+  #print "<BR>".$_;
+}
+
+#print "<BR><B>locationProxyHash</B>";
+for my $service ( keys %locationProxyHash ) {
+  #print "<BR>$service -> ".$locationProxyHash{$service};
+}
+
+#print "<HR>";
+
+# Domain-Config zusammenstellen: Existieren lokale Eintraege,
+# globale Eintraege wegwerfen
+
+my @domainArray=();
+if (@locationDomainArray) {
+  #print "<BR>Lokale Domains gefunden!";
+  @domainArray=@locationDomainArray;
+} else {
+  #print "<BR>Nur globale Domains gefunden!";
+  @domainArray=@globalDomainArray;
+}
+
+# Domain-Config-Inhalte in Javascript-Arrays umwandeln
+my $count=0;
+foreach (@domainArray) {
+  $_="  LocalDomains[$count]=\"$_\";\n";
+  $count++;
+}
+
+# Default-Proxy/Proxies suchen: Existieren lokale Eintraege,
+# globale Proxies wegwerfen
+
+my $defaultProxyString=$globalProxyHash{"DEFAULT"};
+delete $globalProxyHash{"DEFAULT"};
+if (defined ($locationProxyHash{"DEFAULT"})) {
+  #print "<BR>Lokaler Defaultproxy uebernimmt.";
+  $defaultProxyString=$locationProxyHash{"DEFAULT"};
+  delete $locationProxyHash{"DEFAULT"};
+}
+#print "<BR>DefaultProxyString: $defaultProxyString";
+
+
+# Spezialgelagerte Sonderfall-Proxies: Lokale und globale
+# Eintraege in Javascript ueberfuehren
+
+$count=0;
+my @specialDstContent;
+foreach (@specialDstArray) {
+  @specialDstContent=split(" ",$_,2);
+  $_="  SpecialHost[$count]=\"$specialDstContent[0]\";	SpecialHostProxy[$count]=\"$specialDstContent[1]\";\n";
+  $count++;
+}
+
+if (defined ($locationProxyHash{"DEFAULT"})) {
+  #print "<BR>Lokaler Defaultproxy uebernimmt.";
+  $defaultProxyString=$locationProxyHash{"DEFAULT"};
+  delete $locationProxyHash{"DEFAULT"};
+}
+
+
+
+# verbindliche Proxy-Liste zusammenstellen -> wenn kein lokaler Eintrag,
+# dann globalen Eintrag nehmen.
+
+my $proxyLine=();
+my %unionProxyHash=();
+for $proxyLine ( keys %globalProxyHash ) {
+  $unionProxyHash{$proxyLine}=$globalProxyHash{$proxyLine};
+}
+for $proxyLine ( keys %locationProxyHash ) {
+  $unionProxyHash{$proxyLine}=$locationProxyHash{$proxyLine};
+}
+
+
+# Services in der richtigen Reihenfolge ablegen (-> Longest Match first)
+my @serviceLineArray=();
+my @proxyLineArray=();
+for my $service ( keys %unionProxyHash ) {
+  push(@serviceLineArray,$service);
+  $proxyLine="  proxy_".$service." = \"$unionProxyHash{$service}\";\n";
+  #print "<BR>Hier: $service zu $proxyLine";
+  push(@proxyLineArray,$proxyLine);
+}
+
+my @sortedServiceLineArray = sort { length $a <=> length $b } @serviceLineArray;
+@sortedServiceLineArray = reverse(@sortedServiceLineArray);
+
+#print "<HR><HR>sortedServiceLineArray:";
+
+foreach (@sortedServiceLineArray) {
+  my $serviceLen=length($_)+1;
+  my $servicePrefix=$_;
+  $_="    if (url.substring (0,$serviceLen) == \"$servicePrefix:\") {\n";
+  $_=$_."      MainAlert (\"GetServiceProxy - Leave function (\" + proxy_".$servicePrefix." + \")\");\n";
+  $_=$_."      return proxy_".$servicePrefix.";\n";
+  $_=$_."    }\n";
+  #print "<BR>$servicePrefix $serviceLen";
+}
+  push(@sortedServiceLineArray,"   MainAlert (\"GetServiceProxy - Leave function (default proxy, \" + proxy_default + \")\");\n");
+  push(@sortedServiceLineArray,"   return proxy_default;\n");
+
+#print "<BR>@serviceindex<BR>";
+#print "<BR>@sortedserviceindex<BR>";
+#print "<BR>@servicecontent<BR>";
+#print "<H3>Return template</H3>";
+
+my @template=readTemplate();
+
+# Zeitstempel (fast) Ende
+my $endDate=timeStamp();
+
+foreach(@template) {
+  s/%%%IPADDRESS%%%/$remoteAddr/;
+  s/%%%USERAGENT%%%/$remoteAgent/;
+  s/%%%SERVERNAME%%%/$hostname/;
+  s/%%%STARTDATE%%%/$startDate/;
+  s/%%%ENDDATE%%%/$endDate/;
+  s/%%%LOCATIONPROXYARRAY%%%/@proxyLineArray/;
+  s/%%%SPECIALDESTARRAY%%%/@specialDstArray/;
+  s/%%%SPECIALDESTARRAY%%%//;
+  s/%%%LOCALDOMAINARRAY%%%/@domainArray/;
+  s/%%%GETSERVICEPROXY%%%/@sortedServiceLineArray/;
+  #s/\</&lt;/g;
+  #s/\>/&gt;/g;
+}
+
+#print "<PRE>";
+print @template;

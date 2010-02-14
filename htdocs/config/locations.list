@@ -1,0 +1,96 @@
+#
+# locations.list
+# Sample file for proxy settings per location 
+#
+#
+# This file is licensed under GNU GPL version 3.0 or above
+#
+# Copyright (C) 2007-2010 The PACtory Development Team
+#
+# This file is part of the PACtory project.
+# Feedback/comment/suggestions: http://pactory.sf.net
+#
+#
+# Defined keywords:
+# DOMAIN -> Local search domain suffix for this entity, multiple entries possible
+# DEFAULT -> Default proxy for all protocols not explicitely defined
+# PROXY -> Always use proxy for this destination (multiple entries possible)
+# DIRECT -> Never use proxy for this destination (multiple entries possible)
+
+#
+# LocationID=DEFAULT -> These are the defaults if source network is unknown
+#                       (aka not defined in networks.list)
+
+DEFAULT	DOMAIN	yourdnssuffix.com
+DEFAULT	DOMAIN	yourotherdnssuffix.com
+DEFAULT	DEFAULT	PROXY proxy.yourdnssuffix.com:3128
+
+DEFAULT	http	PROXY proxy.yourdnssuffix.com:3128
+DEFAULT	https	PROXY proxy.yourdnssuffix.com:443
+DEFAULT	ftp	PROXY ftpgw.yourdnssuffix.com:21
+DEFAULT	socks	DIRECT
+DEFAULT	rtsp	PROXY rtspgw.yourdnssuffix.com:554
+DEFAULT	mms	DEFAULT
+
+DEFAULT	EXTRA	localhost		DIRECT
+DEFAULT	EXTRA	127.0.0.1		DIRECT
+#Special destination for Wintel PCs with ActiveSync connected PDAs
+DEFAULT	EXTRA	169.254.2.1		DIRECT
+#Special destination domain being connected via different proxy
+DEFAULT	EXTRA	foreigndomain.org	PROXY example.com:3128; PROXY 172.16.1.1:3128
+
+
+#
+# Standard proxies for internal corporate network(s)
+#
+
+CorpNet		DOMAIN	yourdnssuffix.com
+#CorpNet	DOMAIN	subdomain.yourotherdnssuffix.com
+#CorpNet	DOMAIN	severalotherdomains.com
+
+CorpNet	DEFAULT	PROXY proxy.yourdnssuffix.com:3128
+CorpNet	http	PROXY proxy.yourdnssuffix.com:3128
+CorpNet	https	PROXY proxy.yourdnssuffix.com:443
+CorpNet	ftp	PROXY ftpgw.yourdnssuffix.com:21
+CorpNet	socks	DIRECT
+CorpNet	rtsp	PROXY rtspgw.yourdnssuffix.com:554
+CorpNet	mms	DEFAULT
+
+CorpNet	EXTRA	www.yourdnssuffix.com		DIRECT
+CorpNet	EXTRA	webportal.yourdnssuffix.com	PROXY proxy.yourdnssuffix.com:3128
+CorpNet	EXTRA	outlook.yourdnssuffix.com	PROXY differentproxy.yourdnssuffix.com:3128
+CorpNet	EXTRA  	8.8.8.8				PROXY googlegate.somewhereelse.com:1337
+CorpNet	EXTRA  	17.4.5.6			DIRECT
+CorpNet	EXTRA  	123.4.56.78			DIRECT
+
+
+#
+# Extranet entries for not-so-internal networks, using slightly different proxies
+#
+
+ExtraNet	DOMAIN	extranet.yourdnssuffix.com
+ExtraNet	DEFAULT	PROXY extraproxy.yourdnssuffix.com:8080
+ExtraNet	http	PROXY extraproxy.yourdnssuffix.com:8080
+ExtraNet	https	PROXY extraproxy.yourdnssuffix.com:8080
+ExtraNet	ftp	DIRECT
+ExtraNet	socks	DIRECT
+ExtraNet	rtsp	DEFAULT
+ExtraNet	mms	DEFAULT
+
+ExtraNet	EXTRA	www.yourdnssuffix.com		DIRECT
+ExtraNet	EXTRA	webportal.yourdnssuffix.com	PROXY waf.yourdnssuffix.com:3128
+ExtraNet	EXTRA	outlook.yourdnssuffix.com	PROXY waf.yourdnssuffix.com:3128
+ExtraNet	EXTRA  	8.8.8.8				PROXY googlegate.somewhereelse.com:1337
+ExtraNet	EXTRA  	17.4.5.6			DIRECT
+ExtraNet	EXTRA  	123.4.56.78			DIRECT
+
+
+#
+# Very simple location, using only one proxy for all services, two machines for redundancy
+#
+
+SimpleNet	DOMAIN	simple.example.com
+SimpleNet	DEFAULT	PROXY 192.168.123.1:8080 192.168.125.1:8080
+
+SimpleNet	EXTRA	contentpool.burda.com	PROXY proxy.burda.com:443
+SimpleNet	EXTRA   sentinel.burda.com	PROXY proxy.burda.com:80

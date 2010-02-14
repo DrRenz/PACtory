@@ -1,0 +1,56 @@
+#
+# network.list
+# Sample network definitions
+#
+#
+# This file is licensed under GNU GPL version 3.0 or above
+#
+# Copyright (C) 2007-2010 The PACtory Development Team
+#
+# This file is part of the PACtory project.
+# Feedback/comment/suggestions: http://pactory.sf.net
+#
+#
+# Please don't use a location named "0",
+# this is used as "unknown location" in the generator script.
+#
+# Else you can use any single-worded "Location name" you like.
+#
+# Format:
+# Location Network	Subnetmask
+
+#
+# Main corporate location
+#
+
+CorpNet	10.10.0.0	255.255.0.0
+CorpNet	10.17.0.0	255.255.0.0
+
+#
+# Corporate location, other city, transparent network
+#
+
+CorpNet	10.20.0.0	255.255.0.0
+CorpNet	10.25.0.0	255.255.0.0
+
+#
+# Client VPN networks, transparent to corporate network
+#
+
+CorpNet	10.30.0.0	255.255.128.0
+
+#
+# Semi-external network, non-transparent to internal corporate net
+#
+
+ExtraNet	172.16.180.0	255.255.255.0
+ExtraNet	172.16.182.0	255.255.254.0
+ExtraNet	172.16.184.0	255.255.252.0
+ExtraNet	172.16.190.0	255.255.255.0
+
+#
+# Simple external location with own firewalls to the internet
+#
+
+SimpleNet	192.168.123.0	255.255.255.0
+SimpleNet	192.168.125.0	255.255.255.0

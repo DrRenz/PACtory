@@ -1,0 +1,194 @@
+//
+// .pac file template
+//
+// This script is licensed under GNU GPL version 3.0 or above
+// Copyright (C) 2007-2010 The PACtory Development Team
+//
+// This file is part of the PACtory project.
+// Feedback/comment/suggestions: http://pactory.sf.net
+//
+// History:
+// 2007/08/24 0.01: Initial
+// 2007/08/27 0.02: SpecialDestinationProxies added
+// 2007/08/29 0.03: Location dependent proxies added
+// 2007/08/30 0.09: Complete rewrite of program logic
+// 2007/08/31 0.10: Live networks added
+// 2007/09/05 0.11: Burger time: HH added
+// 2008/02/19 0.12: Poccy time: Poccistrasse VBC/CC added
+// 2008/03/19 0.13: DIRECT function for SpecialProxy;
+//                  CMS exclusion added
+// 2008/03/19 0.14: "Last-Resort" location for AutoIP
+//                  (APIPA) added
+// 2008/10/08 0.20: .PAC template created
+// 2009/04/26 0.42: .PAC template optimized
+// 2009/04/27 0.50: Several bugs in PAC template fixed
+// 2010/02/14 1.00: Sourceforge time! Stable version released
+
+// Dynamically generated .pac file!
+// From server: %%%SERVERNAME%%%
+// For IP: %%%IPADDRESS%%%
+// UserAgent: %%%USERAGENT%%%
+// Script started: %%%STARTDATE%%%
+// Script ended: %%%ENDDATE%%%
+
+function FindProxyForURL(url, host)
+{
+
+  // variable strings to return
+
+  var proxy_no = "DIRECT";
+
+  // var my_ip_address = myIpAddress();
+  var my_ip_address = "%%%IPADDRESS%%%";
+
+  var SrcNetworks = new Array;
+  var SrcNMasks = new Array;
+  var SrcLocation = new Array;
+
+  var SpecialHost = new Array;
+  var SpecialHostProxy = new Array;
+  var SpecialService = new Array;
+  var SpecialServiceProxy = new Array;
+
+  var LocalNetworks = new Array;
+  var LocalNMasks = new Array;
+  var LocalDomains = new Array;
+  var arrayindex = "0";
+  var proxyaddress = "";
+
+  // var proxy_default = new Array;
+  // var proxy_http = new Array;
+  // var proxy_https = new Array;
+  // var proxy_ftp = new Array;
+  // var proxy_socks = new Array;
+  // var proxy_rtsp = new Array;
+  // var proxy_mms = new Array;
+
+
+  // Proxy-Adressen fuer verschiedene Services (fuer diesen Standort)
+
+%%%LOCATIONPROXYARRAY%%%
+
+  // Definitionen fuer Hosts und Dienste, die IMMER ueber den Proxy gehen sollen
+  // (auch lokal, z.B. "www.example.com"-Workaround), oder fuer die ein spezieller
+  // Proxy verwendet werden soll (Host- oder Dienstbezogen)
+
+  // SpecialHost[0]="localhost";                  SpecialHostProxy[0]="DIRECT";
+
+%%%SPECIALDESTARRAY%%%
+
+  // SpecialService[0]="ed2k:";          SpecialServiceProxy[0]="SOCKS donkeygw.example.com:666";
+  //SpecialService[1]="torrent:";       SpecialServiceProxy[1]="SOCKS revision.example.com:1337";
+
+  // Netze, die direkt per Route erreicht werden koennen ("Lokal", kann bei
+  // Bedarf auch mit externer Adresse in DMZ sein (...aber direkt erreichbar))
+  LocalNetworks[0]="172.16.0.0";  LocalNMasks[0]="255.240.0.0";
+  LocalNetworks[1]="192.168.0.0"; LocalNMasks[1]="255.255.0.0";
+  LocalNetworks[2]="10.0.0.0";    LocalNMasks[2]="255.0.0.0";
+  LocalNetworks[3]="169.254.0.0"; LocalNMasks[3]="255.255.0.0";
+
+  // Als "lokal" definierte Domains, die direkt per Route erreicht werden koennen
+  // LocalDomains[0]=".ads.example.com";
+
+%%%LOCALDOMAINARRAY%%%
+
+
+
+  //
+  // --- hier beginnt die Funktionslogik, Finger weg! ---
+  //
+
+  function InternalOrExternal(host) {
+
+    MainAlert ("InternalOrExternal - Enter function");
+
+    MainAlert ("InternalOrExternal - DomainLevel " + dnsDomainLevels(host));
+    if (dnsDomainLevels(host) == 0) return "MaybeLocal";
+
+    for (arrayindex=0; arrayindex<LocalDomains.length; arrayindex++) {
+      if (dnsDomainIs(host, LocalDomains[arrayindex])) {
+        MainAlert ("InternalOrExternal - Leave function: MaybeLocal (" + LocalDomains[arrayindex] +")");
+        return "MaybeLocal";
+      }
+    };
+
+    MainAlert ("InternalOrExternal - NotALocalDomain");
+
+    for (arrayindex=0; arrayindex<LocalNetworks.length; arrayindex++) {
+      if (isInNet(host, LocalNetworks[arrayindex], LocalNMasks[arrayindex])) {
+        MainAlert ("InternalOrExternal - Leave function: MaybeLocal (isInNet " + LocalNetworks[arrayindex] +")");
+        return "MaybeLocal";
+      }
+    }
+    MainAlert ("InternalOrExternal - Leave function: ProxyYes");
+    return "ProxyYes";
+  }
+
+  function SpecialProxy(url,host) {
+
+    MainAlert ("SpecialProxy - Enter function");
+
+    for (arrayindex=0; arrayindex<SpecialHost.length; arrayindex++) {
+      if (localHostOrDomainIs(host, SpecialHost[arrayindex])) {
+        MainAlert ("SpecialProxy - Leave function: SpecialHost found (" + SpecialHost[arrayindex]
+                   + ", " + SpecialHostProxy[arrayindex] +")");
+        return (SpecialHostProxy[arrayindex]);
+      }
+    }
+    for (arrayindex=0; arrayindex<SpecialService.length; arrayindex++) {
+      if (url.substring(0,SpecialService[arrayindex].length) == SpecialService[arrayindex]) {
+        MainAlert ("SpecialProxy - Leave function: SpecialService found (" + SpecialService[arrayindex]
+                   + ", "+ SpecialServiceProxy[arrayindex] + ")");
+        return (SpecialServiceProxy[arrayindex]);
+      }
+    }
+    MainAlert ("SpecialProxy - Leave function: NothingSpecial");
+    return "NothingSpecial";
+  }
+
+  function GetServiceProxy(url) {
+
+    MainAlert ("GetServiceProxy - Enter function (" + url +")");
+
+    // Note: There is no SOCKS proxy check, because there is no "SOCKS-URL" to check against
+    // Order: Length descending (premature death at partial match, see 'http' vs. 'httpS')
+
+%%%GETSERVICEPROXY%%%
+
+  }
+
+  function MainAlert(message) {
+    // uncomment below to receive debug info
+    // if (window.console) {
+    //   window.console.log(message);
+    // } else {
+    //   alert (message);
+    // }
+  }
+
+  function GetProxy(url,host,my_ip_address) {
+    proxyaddress=SpecialProxy(url,host);
+    MainAlert ("SpecialProxy: "+ proxyaddress);
+    if (proxyaddress != "NothingSpecial") {
+      MainAlert ("ProxyAddress != NothingSpecial: " + proxyaddress);
+      return (proxyaddress);
+    } else {
+      if (InternalOrExternal(host) == "MaybeLocal") return proxy_no
+      else return GetServiceProxy(url);
+      //,GetLocationID(host,my_ip_address));
+    }
+  }
+
+  // Start Logic ;-)
+
+  MainAlert ("--- Begin ProxyPAC ---");
+  MainAlert ("IP Address: " + my_ip_address );
+  MainAlert ("URL: " + url );
+  MainAlert ("Host: " + host );
+
+  proxyresult = GetProxy(url,host,my_ip_address);
+  MainAlert ("Main: Result " + proxyresult);
+
+  MainAlert ("--- END ProxyPAC ---");
+  return (proxyresult);
+}

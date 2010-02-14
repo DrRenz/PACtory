@@ -1,0 +1,33 @@
+PACtory ReadMe
+==============
+
+Welcome to PACtory!
+
+This software is licensed under GNU GPL version 3.0 or above
+Copyright (C) 2007-2010 The PACtory Development Team
+
+This file is part of the PACtory project.
+Feedback/comment/suggestions: http://pactory.sf.net
+
+
+If you've stumbled upon this nice little piece of software, probably
+it was for good reason ;-)
+
+The setup is as simple as this:
+
+- Put the contents of /htdocs on an internal web server
+
+- Add a handler for ".dat" files to PERL in web server config
+
+- Define your config file path in "wpad.dat" PERL file
+
+- Define location names and networks in network.list
+
+- Define proxies for locations in locations.list
+
+- Point "Proxy Autconfig URL" in your browser to
+  your http://webserver/wpad.dat
+
+- Have fun!
+
+For further instructions, take a look at http://pactory.sf.net !
